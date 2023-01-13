@@ -22,7 +22,6 @@ Routines are assembled into package ***xml***. Pseudotype ***string*** marks any
       , is_attribute boolean   -- flag to distinguish an attribute node from an element node
     );
 
-
 This is а selective procedure, main routine of XML package. Returns set of nodes. Node can be element or attribute. Each row contains some node properties.
 
 ***source*** is xml view of node. For an element node ***source*** looks like **\<elem\>..\</elem\>** and is suitable for further parsing. For an attribute node ***source*** looks like **attr="attribute-value"**.  
