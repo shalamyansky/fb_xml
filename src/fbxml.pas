@@ -11,10 +11,6 @@
 //DDL definition
 (*
 
-create or alter procedure sleep(
-    milliseconds integer
-);
-
 create or alter procedure nodes(
     xml          blob sub_type text character set UTF8
   , xpath        varchar(8191)      character set UTF8
