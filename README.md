@@ -16,8 +16,8 @@ Routines are assembled into package ***xml***. Pseudotype ***string*** marks any
       , xpath        string    -- XPath expression
     )returns(
         number       integer   -- order number of node started from 1
-      , name         string    -- node name
       , source       string    -- XML view of node
+      , name         string    -- node name
       , text         string    -- node value
       , is_attribute boolean   -- flag to distinguish an attribute node from an element node
     );
