@@ -75,7 +75,7 @@ TNodesResultSet = class( TBwrResultSet )
     fNodes  : IXMLNodeList;
     fNumber : LONGINT;
   public
-    constructor Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus ); override;
+    constructor Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus; AContext:IExternalContext; AInMsg:POINTER; AOutMsg:POINTER ); override;
     destructor Destroy; override;
     function  fetch( AStatus:IStatus ):BOOLEAN; override;
     procedure ReleaseDoc;
@@ -97,18 +97,18 @@ end;{ TNodesProcedureFactory.newItem }
 function TNodesProcedure.open( AStatus:IStatus; AContext:IExternalContext; aInMsg:POINTER; aOutMsg:POINTER ):IExternalResultSet;
 begin
     inherited open( AStatus, AContext, aInMsg, aOutMsg );
-    Result := TNodesResultSet.create( Self, AStatus );
+    Result := TNodesResultSet.create( Self, AStatus, AContext, AInMsg, AOutMsg );
 end;{ TNodesProcedure.open }
 
 { TSplitWordsResultSet }
 
-constructor TNodesResultSet.Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus );
+constructor TNodesResultSet.Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus; AContext:IExternalContext; AInMsg:POINTER; AOutMsg:POINTER );
 var
     Xml,     XPath     : UnicodeString;
     XmlNull, XPathNull : WORDBOOL;
     XmlOk,   XPathOk   : BOOLEAN;
 begin
-    inherited Create( ASelectiveProcedure, AStatus );
+    inherited Create( ASelectiveProcedure, AStatus, AContext, AInMsg, AOutMsg );
     fNodes  := nil;
     fNumber := 0;
     XmlOk   := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XML,   Xml,   XmlNull   );
@@ -145,6 +145,7 @@ var
     Node : IXMLNode;
 begin
     Result := FALSE;
+    NumberNull      := TRUE;
     System.Finalize( Source );
     SourceNull      := TRUE;
     System.Finalize( Name );
@@ -174,7 +175,8 @@ begin
             end;
         end;
         Inc( fNumber );
-        Result := TRUE;
+        NumberNull := FALSE;
+        Result     := TRUE;
     end else begin
         Result := FALSE;
         Node   := nil;
