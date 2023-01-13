@@ -176,6 +176,6 @@ Result :
 
     NAME        AREA
     ==========  ==================
-    Angel Fish	Computer Aquariums
-    Boa	        South America
-    Parrot	    South Africa
+    Angel Fish  Computer Aquariums
+    Boa         South America
+    Parrot      South Africa
