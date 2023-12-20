@@ -1,7 +1,7 @@
 (*
     Unit     : fbxml
     Date     : 2023-01-10
-    Compiler : Delphi XE3
+    Compiler : Delphi XE3, Delphi 12
     Author   : Shalamyansky Mikhail Arkadievich
     Contents : Firebird UDR XML support procedure
     Project  : https://github.com/shalamyansky/fb_xml

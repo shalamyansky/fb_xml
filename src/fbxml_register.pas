@@ -1,7 +1,7 @@
 (*
     Unit     : fbxml_register
     Date     : 2023-01-10
-    Compiler : Delphi XE3
+    Compiler : Delphi XE3, Delphi 12
     Author   : Shalamyansky Mikhail Arkadievich
     Contents : Register UDR function for fb_xml module
     Project  : https://github.com/shalamyansky/fb_xml
