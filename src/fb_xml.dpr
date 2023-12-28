@@ -7,10 +7,17 @@
     Project  : https://github.com/shalamyansky/fb_xml
     Company  : BWR
 *)
+
+{$DEFINE NO_FBCLIENT}
+{Define NO_FBCLIENT in your .dproj file to take effect on firebird.pas}
+
+{Undefine KYLIX in OmniXML_JEDI.inc for Linux platform building}
+
+
 library fb_xml;
 
 uses
-    fbxml_register
+  fbxml_register
 ;
 
 {$R *.res}

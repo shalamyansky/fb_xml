@@ -35,7 +35,7 @@ interface
 
 uses
     SysUtils
-  , Windows
+  //, Windows
   , firebird  // https://github.com/shalamyansky/fb_common
   , fbudr     // https://github.com/shalamyansky/fb_common
   , OmniXML
