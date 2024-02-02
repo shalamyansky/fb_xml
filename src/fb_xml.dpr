@@ -17,6 +17,11 @@
 library fb_xml;
 
 uses
+  {$IFDEF FastMM}
+    {$DEFINE ClearLogFileOnStartup}
+    {$DEFINE EnableMemoryLeakReporting}
+    FastMM5,
+  {$ENDIF}
   fbxml_register
 ;
 

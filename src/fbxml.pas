@@ -60,13 +60,12 @@ TNodesProcedure = class( TBwrSelectiveProcedure )
     OUTPUT_FIELD_NAME      = 2;
     OUTPUT_FIELD_TEXT      = 3;
     OUTPUT_FIELD_ATTRIBUTE = 4;
-  public
-    function open( AStatus:IStatus; AContext:IExternalContext; AInMsg:POINTER; AOutMsg:POINTER ):IExternalResultSet; override;
+  protected
+    class function GetBwrResultSetClass:TBwrResultSetClass; override;
 end;{ TNodesProcedure }
 
 TNodesResultSet = class( TBwrResultSet )
   private
-    fDoc    : TXMLDocument;
     fIDoc   : IXMLDocument;
     fNodes  : IXMLNodeList;
     fNumber : LONGINT;
@@ -90,13 +89,13 @@ end;{ TNodesProcedureFactory.newItem }
 
 { TNodesProcedure }
 
-function TNodesProcedure.open( AStatus:IStatus; AContext:IExternalContext; aInMsg:POINTER; aOutMsg:POINTER ):IExternalResultSet;
+class function TNodesProcedure.GetBwrResultSetClass:TBwrResultSetClass;
 begin
-    inherited open( AStatus, AContext, aInMsg, aOutMsg );
-    Result := TNodesResultSet.create( Self, AStatus, AContext, AInMsg, AOutMsg );
-end;{ TNodesProcedure.open }
+    Result := TNodesResultSet;
+end;{ TNodesProcedure.GetBwrResultSetClass }
 
-{ TSplitWordsResultSet }
+
+{ TNodesResultSet }
 
 constructor TNodesResultSet.Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus; AContext:IExternalContext; AInMsg:POINTER; AOutMsg:POINTER );
 var
@@ -110,12 +109,10 @@ begin
     XmlOk   := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XML,   Xml,   XmlNull   );
     XPathOk := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XPATH, XPath, XpathNull );
 
-    fDoc  := nil;
-    fDoc  := TXMLDocument.Create;
     fIDoc := nil;
-    fIDoc := fDoc as IXMLDocument;
-    if( fDoc.LoadXML( Xml ) )then begin
-        fNodes := fDoc.SelectNodes( XPath );
+    fIDoc := CreateXMLDoc;
+    if( fIDoc.LoadXML( Xml ) )then begin
+        fNodes := fIDoc.SelectNodes( XPath );
     end;
 end;{ TNodesResultSet.Create }
 
@@ -129,7 +126,6 @@ procedure TNodesResultSet.ReleaseDoc;
 begin
     fNodes := nil;
     fIDoc  := nil;
-    fDoc   := nil;
 end;{ TNodesResultSet.ReleaseDoc }
 
 function TNodesResultSet.fetch( AStatus:IStatus ):BOOLEAN;
