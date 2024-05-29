@@ -3,7 +3,7 @@ Firebird UDR module to support XML parsing in SQL.
 
 ## Basis
 
-Parsing is based on [Delphi OmniXML components](https://github.com/mremec/omnixml "OmniXML") version 1.04.
+Parsing is based on bundled Delphi ADOM4 or OmniXML parsers.
 
 ## Routines
 
@@ -12,15 +12,31 @@ Routines are assembled into package ***xml***. Pseudotype ***string*** marks any
 ## procedure *nodes*
 
     procedure nodes(
-        xml          string    -- XML to be parsed
-      , xpath        string    -- XPath expression
+        xml        string    -- XML to be parsed
+      , xpath      string    -- XPath expression
     )returns(
-        number       integer   -- order number of node started from 1
-      , source       string    -- XML view of node
-      , name         string    -- node name
-      , text         string    -- node value
-      , is_attribute boolean   -- flag to distinguish an attribute node from an element node
+        number     integer   -- order number of node started from 1
+      , source     string    -- XML view of node
+      , name       string    -- node name
+      , text       string    -- node value
+      , node_type  smallint  -- node type
+      , path       string    -- full path from source xml root to the found node
     );
+
+    Node types are:
+		 1 - element node
+		 2 - attribute node
+		 3 - text node
+		 4 - CDATA section node
+		 5 - entity reference node
+		 6 - entity node
+		 7 - processing instruction node
+		 8 - comment node
+		 9 - document node
+		10 - document type node
+		11 - document fragment node
+		12 - notation node
+
 
 This is а selective procedure, main routine of XML package. Returns set of nodes. Node can be element or attribute. Each row contains some node properties.
 
@@ -45,10 +61,9 @@ These are truncated versions of ***nodes*** procedure. Return source or value of
 
 ## Limitations
 
-The module provides very simple XPath. Axes are not supported except native child axis. Functions are not supported. But for a lot of tasks in SQL context it is enough.
+The module provides very simple XPath. More complex if ADOM4 XML parser is selected to compile (by default). But it be faster with OmniXML parser.
 
 ## Installation
-
 
 0. Download a release package.
 
@@ -179,3 +194,22 @@ Result :
     Angel Fish  Computer Aquariums
     Boa         South America
     Parrot      South Africa
+
+### Example 5
+
+Task : select all the animal elements
+
+Solution :  
+	
+	select
+		  *
+	  from
+	    xml.nodes( :XML, '//animal' )
+
+Result :
+
+	NUMBER  SOURCE                                                                                  NAME    TEXT                NODE_TYPE  PATH
+	======  ======================================================================================  ======  ==================  =========  ==================
+	     1  <animal name="Angel Fish" size="2" weight="2"><area>Computer Aquariums</area></animal>  animal  Computer Aquariums          1  /animals/animal[1]
+	     2  <animal name="Boa" size="10" weight="10"><area>South America</area></animal>            animal  South America               1  /animals/animal[2]
+	     3  <animal name="Parrot" size="30" weight="30"><area>South Africa</area></animal>          animal  South Africa                1  /animals/animal[3]

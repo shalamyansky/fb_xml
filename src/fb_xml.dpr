@@ -9,9 +9,23 @@
 *)
 
 {$DEFINE NO_FBCLIENT}
-{Define NO_FBCLIENT in your .dproj file to take effect on firebird.pas}
+(*
+Define NO_FBCLIENT in your .dproj file to take effect on firebird.pas
+*)
+(*
+ADOM4 DOM Vendor is used by default.
+Define OMNIXML in your .dproj file to use OmniXML DOM Vendor.
+ADOM4 supports XPath better but OmniXML is faster.
+*)
 
-{Undefine KYLIX in OmniXML_JEDI.inc for Linux platform building}
+(* Changes:
+2024-05-29 ver. 2.1.0.0
+ - Returns node_type insteed of is_attribute;
+ - Returns full path from xml root to the found node;
+ - DOM Vendor bundled with Delphi is used, and there are alternative options:
+     a) ADOM4
+     b) OmniXML.
+*)
 
 
 library fb_xml;
