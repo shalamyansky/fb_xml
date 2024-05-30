@@ -38,7 +38,7 @@ Routines are assembled into package ***xml***. Pseudotype ***string*** marks any
 		12 - notation node
 
 
-This is а selective procedure, main routine of XML package. Returns set of nodes. Node can be element or attribute. Each row contains some node properties.
+This is а selective procedure, main routine of XML package. Returns set of nodes. Each row contains some node properties.
 
 ***source*** is xml view of node. For an element node ***source*** looks like **\<elem\>..\</elem\>** and is suitable for further parsing. For an attribute node ***source*** looks like **attr="attribute-value"**.  
 
