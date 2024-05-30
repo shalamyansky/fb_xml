@@ -45,7 +45,7 @@ This is а selective procedure, main routine of XML package. Returns set of node
 ***text*** is the node scalar value, i.e. it is element text for an element node or an attribute value for an attribute node.
 
 
-## functions *get_node* and *get_value*
+## functions *get_node*, *get_value* and *get_name*
 
     function get_node(
         xml   string    -- XML to be parsed
@@ -57,7 +57,12 @@ This is а selective procedure, main routine of XML package. Returns set of node
       , xpath string    -- XPath expression
     )returns  string;   -- value of the first found node (text)
 
-These are truncated versions of ***nodes*** procedure. Return source or value of the first found node.
+    function get_name(
+        xml   string    -- XML to be parsed
+      , xpath string    -- XPath expression
+    )returns  string;   -- name of the first found node (name)
+
+These are truncated versions of ***nodes*** procedure. Return source or value or name of the first found node.
 
 ## Limitations
 

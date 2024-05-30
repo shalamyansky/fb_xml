@@ -133,14 +133,16 @@ var
 begin
     inherited Create( ASelectiveProcedure, AStatus, AContext, AInMsg, AOutMsg );
     fNodes  := nil;
+    fIDoc   := nil;
     fNumber := 0;
     XmlOk   := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XML,   Xml,   XmlNull   );
     XPathOk := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XPATH, XPath, XpathNull );
 
-    fIDoc := nil;
-    fIDoc := LoadXMLData( Xml );
-    if( Supports( fIDoc.DOMDocument, IDomNodeSelect, DomNodeSelect ) )then begin
-        fNodes := DomNodeSelect.SelectNodes( XPath );
+    if( Xml <> '' )then begin
+        fIDoc := LoadXMLData( Xml );
+        if( Supports( fIDoc.DOMDocument, IDomNodeSelect, DomNodeSelect ) )then begin
+            fNodes := DomNodeSelect.SelectNodes( XPath );
+        end;
     end;
 end;{ TNodesResultSet.Create }
 
