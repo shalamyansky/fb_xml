@@ -130,6 +130,7 @@ var
     XmlNull, XPathNull : WORDBOOL;
     XmlOk,   XPathOk   : BOOLEAN;
     DomNodeSelect      : IdomNodeSelect;
+    XmlDocOptions      : TXMLDocOptions;
 begin
     inherited Create( ASelectiveProcedure, AStatus, AContext, AInMsg, AOutMsg );
     fNodes  := nil;
@@ -139,9 +140,16 @@ begin
     XPathOk := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XPATH, XPath, XpathNull );
 
     if( Xml <> '' )then begin
+
         fIDoc := LoadXMLData( Xml );
-        if( Supports( fIDoc.DOMDocument, IDomNodeSelect, DomNodeSelect ) )then begin
-            fNodes := DomNodeSelect.SelectNodes( XPath );
+        if( fIDoc <> nil )then begin
+            XmlDocOptions := fIDoc.Options;
+            Exclude( XmlDocOptions, doNamespaceDecl );
+            fIDoc.Options := XmlDocOptions;
+
+            if( Supports( fIDoc.DOMDocument, IDomNodeSelect, DomNodeSelect ) )then begin
+                fNodes := DomNodeSelect.SelectNodes( XPath );
+            end;
         end;
     end;
 end;{ TNodesResultSet.Create }
@@ -307,18 +315,77 @@ begin
     end;
 end;{ GetNodePath }
 
+{$IFNDEF OMNIXML} //i.e. ADOM4 selected
+//ADOM vendor does not recognize xpath like '/xxx:yyy'.
+//This code snippet is intended to fix it.
+
+function GetContextNamespaceURI( ContextNode:IDomNode; const Prefix:UnicodeString ):UnicodeString;
+var
+    RootNode   : IDomNode;
+    attributes : IDOMNamedNodeMap;
+    attrNode   : IDomNode;
+begin
+    Result := '';
+    if( ( ContextNode = nil ) or ( Prefix = '' ) )then begin
+        exit;
+    end;
+    RootNode := ContextNode.firstChild;
+    if( ( RootNode <> nil ) and SameText( RootNode.NodeName, 'xml' ) )then begin
+        if( SameText( RootNode.NodeName, 'xml' ) )then begin
+            RootNode := RootNode.nextSibling;
+        end;
+    end;
+    if( RootNode <> nil )then begin
+        attributes := RootNode.attributes;
+        if( attributes <> nil )then begin
+            attrNode := attributes.getNamedItemNS( SXMLNamespaceURI, Prefix );
+            if( ( attrNode <> nil ) and ( attrNode.nodeType = ATTRIBUTE_NODE ) )then begin
+                Result := attrNode.nodeValue;
+            end;
+        end;
+    end;
+end;{ GetContextNamespaceURI }
+
+type
+
+TLookupNamespaceHelper = class
+  private
+    procedure DoLookupNamespaceURI( const AContextNode: IDomNode; const APrefix: WideString; var ANamespaceURI: WideString );
+end;
+
+procedure TLookupNamespaceHelper.DoLookupNamespaceURI( const AContextNode: IDomNode; const APrefix: WideString; var ANamespaceURI: WideString );
+begin
+    ANamespaceURI := GetContextNamespaceURI( AContextNode, APrefix );
+end;{ TLookupNamespaceHelper.DoLookupNamespaceURI }
+
+{$ENDIF}
+
+
 procedure InitProc;
 begin
     {$IFDEF OMNIXML}
         Xml.xmldom.DefaultDOMVendor := Xml.omnixmldom.sOmniXmlVendor;
     {$ELSE}
         Xml.xmldom.DefaultDOMVendor := Xml.adomxmldom.sAdom4XmlVendor;
+        Xml.adomxmldom.OnOx4XPathLookupNamespaceURI := TLookupNamespaceHelper( nil ).DoLookupNamespaceURI;
     {$ENDIF}
 end;{ InitProc }
+
+procedure FinalProc;
+begin
+    {$IFNDEF OMNIXML}
+        Xml.adomxmldom.OnOx4XPathLookupNamespaceURI := nil;
+    {$ENDIF}
+end;{ FinalProc }
 
 initialization
 begin
     InitProc;
 end;{ initialization }
+
+finalization
+begin
+    FinalProc;
+end;{ finalization }
 
 end.
