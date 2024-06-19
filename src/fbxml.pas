@@ -43,6 +43,14 @@ engine
 // 12 - notation node
 *)
 
+{$IFNDEF MSWINDOWS}
+    {$UNDEF MSXML}
+{$ENDIF}
+// ADOM DOM Vendor as default
+{$IF ( not Defined(MSXML) ) and ( not Defined(OMNIXML) )}
+    {$DEFINE ADOMXML}
+{$IFEND}
+
 unit fbxml;
 
 interface
@@ -54,11 +62,15 @@ uses
   , Xml.XMLIntf
   , Xml.XMLDoc
   , Xml.xmldom
-  {$IFDEF OMNIXML}
+  //Choose DOM Vendor                                                                                         3
+  {$IF     Defined( MSXML   )}
+    , Winapi.ActiveX
+    , Xml.Win.msxmldom
+  {$ELSEIF Defined( OMNIXML )}
     , Xml.omnixmldom
-  {$ELSE}
+  {$ELSEIF Defined( ADOMXML )}
     , Xml.adomxmldom
-  {$ENDIF}
+  {$IFEND}
 ;
 
 
@@ -315,7 +327,7 @@ begin
     end;
 end;{ GetNodePath }
 
-{$IFNDEF OMNIXML} //i.e. ADOM4 selected
+{$IFDEF ADOMXML}
 //ADOM vendor does not recognize xpath like '/xxx:yyy'.
 //This code snippet is intended to fix it.
 
@@ -360,22 +372,28 @@ end;{ TLookupNamespaceHelper.DoLookupNamespaceURI }
 
 {$ENDIF}
 
-
 procedure InitProc;
 begin
-    {$IFDEF OMNIXML}
+    {$IF Defined(MSXML)}
+        CoInitialize( nil );
+        Xml.xmldom.DefaultDOMVendor := Xml.Win.msxmldom.SMSXML;
+    {$ELSEIF Defined(OMNIXML)}
         Xml.xmldom.DefaultDOMVendor := Xml.omnixmldom.sOmniXmlVendor;
-    {$ELSE}
+    {$ELSEIF Defined(ADOMXML)}
         Xml.xmldom.DefaultDOMVendor := Xml.adomxmldom.sAdom4XmlVendor;
         Xml.adomxmldom.OnOx4XPathLookupNamespaceURI := TLookupNamespaceHelper( nil ).DoLookupNamespaceURI;
-    {$ENDIF}
+    {$IFEND}
 end;{ InitProc }
 
 procedure FinalProc;
 begin
-    {$IFNDEF OMNIXML}
+    Xml.xmldom.DefaultDOMVendor := '';
+    {$IF Defined(MSXML)}
+        CoUninitialize();
+    {$ELSEIF Defined(OMNIXML)}
+    {$ELSEIF Defined(ADOMXML)}
         Xml.adomxmldom.OnOx4XPathLookupNamespaceURI := nil;
-    {$ENDIF}
+    {$IFEND}
 end;{ FinalProc }
 
 initialization
