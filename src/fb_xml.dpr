@@ -14,17 +14,20 @@ Define NO_FBCLIENT in your .dproj file to take effect on firebird.pas
 *)
 (*
 ADOM4 DOM Vendor is used by default.
+Define ADOMXML in your .dproj file to use ADOM4 DOM Vendor.
 Define OMNIXML in your .dproj file to use OmniXML DOM Vendor.
 ADOM4 supports XPath better but OmniXML is faster.
 *)
 
 (* Changes:
-2024-05-29 ver. 2.1.0.0
+ 2024-05-29 ver. 2.1.0.0
  - Returns node_type insteed of is_attribute;
  - Returns full path from xml root to the found node;
  - DOM Vendor bundled with Delphi is used, and there are alternative options:
      a) ADOM4
      b) OmniXML.
+ 2025-01-29 ver. 2.1.4.0
+ - Blobs are created as stream and temporary ones;
 *)
 
 
