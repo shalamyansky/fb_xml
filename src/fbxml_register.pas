@@ -82,7 +82,8 @@ var
 
 function firebird_udr_plugin( AStatus:IStatus; AUnloadFlagLocal:BooleanPtr; AUdrPlugin:IUdrPlugin ):BooleanPtr; cdecl;
 begin
-    AUdrPlugin.registerProcedure( AStatus, 'nodes', fbxml.TNodesProcedureFactory.Create() );
+    AUdrPlugin.registerProcedure( AStatus, 'nodes',        fbxml.TXNodesProcedureFactory.Create() );
+    AUdrPlugin.registerProcedure( AStatus, 'handle_nodes', fbxml.THNodesProcedureFactory.Create() );
 
     theirUnloadFlag := AUnloadFlagLocal;
     Result          := @myUnloadFlag;

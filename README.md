@@ -9,7 +9,7 @@ Parsing is based on bundled Delphi ADOM4 or OmniXML parsers.
 
 Routines are assembled into package ***xml***. Pseudotype ***string*** marks any of string type ***char***, ***varchar*** of any length or ***blob sub_type text***. All the routines can accept and return any string type.
 
-## procedure *nodes*
+## procedures *nodes*
 
     procedure nodes(
         xml        string    -- XML to be parsed
@@ -21,6 +21,22 @@ Routines are assembled into package ***xml***. Pseudotype ***string*** marks any
       , text       string    -- node value
       , node_type  smallint  -- node type
       , path       string    -- full path from source xml root to the found node
+      , root       bigint    -- xml document root handle  
+      , node       bigint    -- node handle  
+    );
+
+    procedure handle_nodes(
+        handle     bigint    -- handle of node to be explored
+      , xpath      string    -- XPath expression
+    )returns(
+        number     integer   -- order number of node started from 1
+      , source     string    -- XML view of node
+      , name       string    -- node name
+      , text       string    -- node value
+      , node_type  smallint  -- node type
+      , path       string    -- full path from source xml root to the found node
+      , root       bigint    -- xml document root handle  
+      , node       bigint    -- node handle  
     );
 
     Node types are:
@@ -38,31 +54,56 @@ Routines are assembled into package ***xml***. Pseudotype ***string*** marks any
 		12 - notation node
 
 
-This is а selective procedure, main routine of XML package. Returns set of nodes. Each row contains some node properties.
+Procedure ***nodes*** а selective procedure, main routine of XML package. Returns set of nodes. Each row contains some node properties. Procedure ***handle_nodes*** is its analogue for just early parsed xml document.
 
 ***source*** is xml view of node. For an element node ***source*** looks like **\<elem\>..\</elem\>** and is suitable for further parsing. For an attribute node ***source*** looks like **attr="attribute-value"**.  
 
 ***text*** is the node scalar value, i.e. it is element text for an element node or an attribute value for an attribute node.
 
+***root*** and ***node*** are handles (pointers) of nodes to pass its to **handle_** family functions. ***root*** value is common to the result set. See **Notes** and **Examples**.
+
 
 ## functions *get_node*, *get_value* and *get_name*
 
     function get_node(
-        xml   string    -- XML to be parsed
-      , xpath string    -- XPath expression
-    )returns  string;   -- XML view of the first found node (source)
+        xml    string    -- XML to be parsed
+      , xpath  string    -- XPath expression
+    )returns   string;   -- XML view of the first found node (source)
 
     function get_value(
-        xml   string    -- XML to be parsed
-      , xpath string    -- XPath expression
-    )returns  string;   -- value of the first found node (text)
+        xml    string    -- XML to be parsed
+      , xpath  string    -- XPath expression
+    )returns   string;   -- value of the first found node (text)
 
     function get_name(
-        xml   string    -- XML to be parsed
-      , xpath string    -- XPath expression
-    )returns  string;   -- name of the first found node (name)
+        xml    string    -- XML to be parsed
+      , xpath  string    -- XPath expression
+    )returns   string;   -- name of the first found node (name)
 
-These are truncated versions of ***nodes*** procedure. Return source or value or name of the first found node.
+    function handle_get_node(
+        handle bigint    -- handle of node to be explored
+      , xpath  string    -- XPath expression
+    )returns   string;   -- XML view of the first found node (source)
+
+    function handle_get_value(
+        handle bigint    -- handle of node to be explored
+      , xpath  string    -- XPath expression
+    )returns   string;   -- value of the first found node (text)
+
+    function handle_get_name(
+        handle bigint    -- handle of node to be explored
+      , xpath  string    -- XPath expression
+    )returns   string;   -- name of the first found node (name)
+
+These are truncated versions of ***nodes/handle_nodes*** procedures. Return source or value or name of the first found node.
+
+## Notes
+
+Procedures ***nodes*** and ***handle_nodes*** returns and all the ***handle_*** family routines accepts nodes handles. Thus once parsed entire xml document can be explored fast and thoroughly.
+
+Another way is to use text versions of the procedures and pass them text views of the nodes extracted above. This method works, but requires more time and resources due to excessive reparsing of all nodes.
+
+Be careful with handles. There is nothing you can do with them except pass them to the routines of the ***handle_*** family. Each root handle is alive until its select operator completed. Each child node handle is alive during its fetch iteration only. Using any handle outside of its lifetime is fraught with disruption of the server. Please see examples 5 and 6.
 
 ## Limitations
 
@@ -92,9 +133,10 @@ If you get code or part of code please keep my name and a link [here](https://gi
 
 Animals XML data:
 
-	<animals>
+	<animals desc="sample">
 	  <animal name="Angel Fish" size="2" weight="2">
 	    <area>Computer Aquariums</area>
+	    <area>Asia</area>
 	  </animal>
 	  <animal name="Boa" size="10" weight="10">
 	    <area>South America</area>
@@ -184,13 +226,21 @@ Result :
 
 Task : select all animal names and areas
 
-Solution :  
+Solution 1:  
 
     select
           xml.get_value( animal.source, 'animal/@name' ) as name
         , xml.get_value( animal.source, 'animal/area'  ) as area
       from
         xml.nodes( :XML, 'animals/animal' ) as animal
+
+Solution 2:  
+
+		select
+		      xml.handle_get_value( animal.node, '@name' ) as name
+		    , xml.handle_get_value( animal.node, 'area'  ) as area
+		  from
+		    xml.nodes( :XML, 'animals/animal' ) as animal
 
 Result :
 
@@ -200,21 +250,63 @@ Result :
     Boa         South America
     Parrot      South Africa
 
-### Example 5
+### Example 6
 
-Task : select all the animal elements
+Task : select animal areas with common description
 
 Solution :  
 	
-	select
-		  *
-	  from
-	    xml.nodes( :XML, '//animal' )
+		create or alter procedure select_animal_areas(
+		    xml         blob sub_type text
+		)returns(
+		    description varchar(32765),
+		    animal      varchar(32765),
+		    areas       varchar(32765)
+		)as
+		    declare variable root bigint;
+		    declare variable node bigint;
+		begin
+		
+		    for select
+		          animal.root
+		        , animal.node
+		      from
+		        xml.nodes( :xml, 'animals/animal' ) animal
+		      into
+		          :root
+		        , :node
+		    do begin
+		
+		        if( :description is null )then begin
+		            :description = xml.handle_get_value( :root, 'animals/@desc' );
+		        end
+		
+		        :animal = xml.handle_get_value( :node, '@name' );
+		
+		        select
+		            list( area.text, ', ' ) as areas
+		          from
+		            xml.handle_nodes( :node, 'area' ) area
+		          into
+		            : areas
+		        ;
+		
+		        suspend;
+		    end
+		
+		end
+
+		select
+		      description
+		    , animal
+		    , areas
+		  from
+		    select_animal_areas( :xml )
 
 Result :
 
-	NUMBER  SOURCE                                                                                  NAME    TEXT                NODE_TYPE  PATH
-	======  ======================================================================================  ======  ==================  =========  ==================
-	     1  <animal name="Angel Fish" size="2" weight="2"><area>Computer Aquariums</area></animal>  animal  Computer Aquariums          1  /animals/animal[1]
-	     2  <animal name="Boa" size="10" weight="10"><area>South America</area></animal>            animal  South America               1  /animals/animal[2]
-	     3  <animal name="Parrot" size="30" weight="30"><area>South Africa</area></animal>          animal  South Africa                1  /animals/animal[3]
+	DESCRIPTION  ANIMAL      AREAS     
+	===========  ==========  ========================
+	sample       Angel Fish  Computer Aquariums, Asia
+	sample       Boa         South America
+	sample       Parrot      South Africa

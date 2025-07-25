@@ -21,9 +21,30 @@ create or alter procedure nodes(
   , text      varchar(8191)      character set UTF8
   , node_type smallint
   , path      varchar(8191)      character set UTF8
+  , root      bigint
+  , node      bigint
 )
 external name
     'fb_xml!nodes'
+engine
+    udr
+;
+
+create or alter procedure $nodes(
+    $xml      bigint
+  , xpath     varchar(8191)      character set UTF8
+)returns(
+    number    integer
+  , source    blob sub_type text character set UTF8
+  , name      varchar(8191)      character set UTF8
+  , text      varchar(8191)      character set UTF8
+  , node_type smallint
+  , path      varchar(8191)      character set UTF8
+  , root      bigint
+  , node      bigint
+)
+external name
+    'fb_xml!$nodes'
 engine
     udr
 ;
@@ -76,16 +97,10 @@ uses
 
 type
 
-{ sleep }
+{ TBaseNodesProcedure }
 
-TNodesProcedureFactory = class( TBwrProcedureFactory )
-  public
-    function newItem( AStatus:IStatus; AContext:IExternalContext; AMetadata:IRoutineMetadata ):IExternalProcedure; override;
-end;{ TNodesProcedureFactory }
-
-TNodesProcedure = class( TBwrSelectiveProcedure )
+TBaseNodesProcedure = class( TBwrSelectiveProcedure )
   const
-    INPUT_FIELD_XML     = 0;
     INPUT_FIELD_XPATH   = 1;
     OUTPUT_FIELD_NUMBER = 0;
     OUTPUT_FIELD_SOURCE = 1;
@@ -93,21 +108,70 @@ TNodesProcedure = class( TBwrSelectiveProcedure )
     OUTPUT_FIELD_TEXT   = 3;
     OUTPUT_FIELD_TYPE   = 4;
     OUTPUT_FIELD_PATH   = 5;
+    OUTPUT_FIELD_ROOT   = 6;
+    OUTPUT_FIELD_NODE   = 7;
   protected
     class function GetBwrResultSetClass:TBwrResultSetClass; override;
-end;{ TNodesProcedure }
+end;{ TBaseNodesProcedure }
 
-TNodesResultSet = class( TBwrResultSet )
+TBaseNodesResultSet = class( TBwrResultSet )
   private
-    fIDoc   : IXMLDocument;
-    fNodes  : IDomNodeList;
+    fRoot   : IDOMNodeEx;
+    fNodes  : IDOMNodeList;
+    fNode   : IDOMNodeEx;
     fNumber : LONGINT;
+  protected
+    procedure SetRoot( AStatus:IStatus ); virtual;
   public
     constructor Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus; AContext:IExternalContext; AInMsg:POINTER; AOutMsg:POINTER ); override;
+    destructor  Destroy; override;
+    function    fetch( AStatus:IStatus ):BOOLEAN; override;
+end;{ TBaseNodesResultSet }
+
+
+{ THNodesProcedure }
+
+THNodesProcedureFactory = class( TBwrProcedureFactory )
+  public
+    function newItem( AStatus:IStatus; AContext:IExternalContext; AMetadata:IRoutineMetadata ):IExternalProcedure; override;
+end;{ TNodesProcedureFactory }
+
+THNodesProcedure = class( TBaseNodesProcedure )
+  const
+    INPUT_FIELD_NODE = 0;
+  protected
+    class function GetBwrResultSetClass:TBwrResultSetClass; override;
+end;{ THNodesProcedure }
+
+THNodesResultSet = class( TBaseNodesResultSet )
+  protected
+    procedure SetRoot( AStatus:IStatus ); override;
+end;{ THNodesResultSet }
+
+
+
+{ TXNodesProcedure }
+
+TXNodesProcedureFactory = class( TBwrProcedureFactory )
+  public
+    function newItem( AStatus:IStatus; AContext:IExternalContext; AMetadata:IRoutineMetadata ):IExternalProcedure; override;
+end;{ TXNodesProcedureFactory }
+
+TXNodesProcedure = class( TBaseNodesProcedure )
+  const
+    INPUT_FIELD_XML = 0;
+  protected
+    class function GetBwrResultSetClass:TBwrResultSetClass; override;
+end;{ TXNodesProcedure }
+
+TXNodesResultSet = class( TBaseNodesResultSet )
+  private
+    fDoc : IXMLDocument;
+  protected
+    procedure SetRoot( AStatus:IStatus ); override;
+  public
     destructor Destroy; override;
-    function  fetch( AStatus:IStatus ):BOOLEAN; override;
-    procedure ReleaseDoc;
-end;{ TNodesResultSet }
+end;{ TXNodesResultSet }
 
 
 function GetNodeSource( Node:IDOMNodeEx ):UnicodeString;
@@ -119,72 +183,70 @@ function GetNodePath( Node:IDOMNode ):UnicodeString;
 implementation
 
 
-{ TNodesProcedureFactory }
+{ TBaseNodesProcedure }
 
-function TNodesProcedureFactory.newItem( AStatus:IStatus; AContext:IExternalContext; AMetadata:IRoutineMetadata ):IExternalProcedure;
+class function TBaseNodesProcedure.GetBwrResultSetClass:TBwrResultSetClass;
 begin
-    Result := TNodesProcedure.create( AMetadata );
-end;{ TNodesProcedureFactory.newItem }
+    Result := TBaseNodesResultSet;
+end;{ TBaseNodesProcedure.GetBwrResultSetClass }
 
-{ TNodesProcedure }
+{ TBaseNodesResultSet }
 
-class function TNodesProcedure.GetBwrResultSetClass:TBwrResultSetClass;
+procedure TBaseNodesResultSet.SetRoot( AStatus:IStatus );
 begin
-    Result := TNodesResultSet;
-end;{ TNodesProcedure.GetBwrResultSetClass }
+    fRoot := nil;
+end;{ TBaseNodesResultSet.SetRoot }
 
-
-{ TNodesResultSet }
-
-constructor TNodesResultSet.Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus; AContext:IExternalContext; AInMsg:POINTER; AOutMsg:POINTER );
+constructor TBaseNodesResultSet.Create( ASelectiveProcedure:TBwrSelectiveProcedure; AStatus:IStatus; AContext:IExternalContext; AInMsg:POINTER; AOutMsg:POINTER );
 var
     Xml,     XPath     : UnicodeString;
     XmlNull, XPathNull : WORDBOOL;
     XmlOk,   XPathOk   : BOOLEAN;
-    DomNodeSelect      : IdomNodeSelect;
-    XmlDocOptions      : TXMLDocOptions;
+    DomNodeSelect      : IDomNodeSelect;
 begin
     inherited Create( ASelectiveProcedure, AStatus, AContext, AInMsg, AOutMsg );
     fNodes  := nil;
-    fIDoc   := nil;
+    fRoot   := nil;
     fNumber := 0;
-    XmlOk   := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XML,   Xml,   XmlNull   );
-    XPathOk := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XPATH, XPath, XpathNull );
-
-    if( Xml <> '' )then begin
-
-        fIDoc := LoadXMLData( Xml );
-        if( fIDoc <> nil )then begin
-            XmlDocOptions := fIDoc.Options;
-            Exclude( XmlDocOptions, doNamespaceDecl );
-            fIDoc.Options := XmlDocOptions;
-
-            if( Supports( fIDoc.DOMDocument, IDomNodeSelect, DomNodeSelect ) )then begin
-                fNodes := DomNodeSelect.SelectNodes( XPath );
-            end;
-        end;
+    SetRoot( AStatus );
+    XPathOk  := RoutineContext.ReadInputString( AStatus, TBaseNodesProcedure.INPUT_FIELD_XPATH, XPath, XPathNull );
+    if( XPathOk and Supports( fRoot, IDomNodeSelect, DomNodeSelect ) )then begin
+        fNodes := DomNodeSelect.SelectNodes( XPath );
     end;
-end;{ TNodesResultSet.Create }
+//    XmlOk    := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XML,   Xml,   XmlNull   );
+//    XPathOk  := RoutineContext.ReadInputString( AStatus, TNodesProcedure.INPUT_FIELD_XPATH, XPath, XpathNull );
+//
+//    if( Xml <> '' )then begin
+//
+//        fDoc := LoadXMLData( Xml );
+//        if( fDoc <> nil )then begin
+//            XmlDocOptions := fDoc.Options;
+//            Exclude( XmlDocOptions, doNamespaceDecl );
+//            fDoc.Options := XmlDocOptions;
+//
+//            fRoot := GetDOMNodeEx( fDoc.DOMDocument );
+//            if( Supports( fRoot, IDomNodeSelect, DomNodeSelect ) )then begin
+//                fNodes := DomNodeSelect.SelectNodes( XPath );
+//            end;
+//        end;
+//    end;
+end;{ TBaseNodesResultSet.Create }
 
-destructor TNodesResultSet.Destroy;
+destructor TBaseNodesResultSet.Destroy;
 begin
-    ReleaseDoc;
     inherited Destroy;
-end;{ TNodesResultSet.Destroy; }
-
-procedure TNodesResultSet.ReleaseDoc;
-begin
+    fNode  := nil;
     fNodes := nil;
-    fIDoc  := nil;
-end;{ TNodesResultSet.ReleaseDoc }
+    fRoot  := nil;
+end;{ TBaseNodesResultSet.Destroy; }
 
-function TNodesResultSet.fetch( AStatus:IStatus ):BOOLEAN;
+function TBaseNodesResultSet.fetch( AStatus:IStatus ):BOOLEAN;
 var
     Source, Name, Text, Path : UnicodeString;
     NodeType                 : SMALLINT;
-    NumberNull, SourceNull, NameNull, TextNull, NodeTypeNull, PathNull : WORDBOOL;
-    NumberOk,   SourceOk,   NameOk,   TextOk,   NodeTypeOk,   PathOk   : BOOLEAN;
-    Node : IDOMNodeEx;
+    NumberNull, SourceNull, NameNull, TextNull, NodeTypeNull, PathNull, RootNull, NodeNull : WORDBOOL;
+    NumberOk,   SourceOk,   NameOk,   TextOk,   NodeTypeOk,   PathOk,   RootOk,   NodeOk   : BOOLEAN;
+    Root, Node : INT64;
 begin
     Result := FALSE;
     NumberNull      := TRUE;
@@ -198,40 +260,129 @@ begin
     NodeTypeNull    := TRUE;
     System.Finalize( Path );
     PathNull        := TRUE;
-    Node            := nil;
+    Root            := 0;
+    RootNull        := TRUE;
+    fNode           := nil;
+    Node            := 0;
+    NodeNull        := TRUE;
     if( ( fNodes <> nil ) and ( fNumber < fNodes.Length ) )then begin
-        Node := GetDOMNodeEx( fNodes.Item[ fNumber ] );
-        if( Node <> nil )then begin
-            Source       := GetNodeSource( Node );
+        fNode := GetDOMNodeEx( fNodes.Item[ fNumber ] );
+        if( fNode <> nil )then begin
+            Source       := GetNodeSource( fNode );
             SourceNull   := FALSE;
-            Name         := Node.NodeName;
+            Name         := fNode.NodeName;
             NameNull     := FALSE;
-            NodeType     := SMALLINT( Node.NodeType );
+            NodeType     := SMALLINT( fNode.NodeType );
             NodeTypeNull := FALSE;
-            if( Node.NodeType = ATTRIBUTE_NODE )then begin
-                Text     := Node.NodeValue;
+            if( fNode.NodeType = ATTRIBUTE_NODE )then begin
+                Text     := fNode.NodeValue;
                 TextNull := FALSE;
             end else begin
-                Text     := Node.Text;
+                Text     := fNode.Text;
                 TextNull := FALSE;
             end;
-            Path         := GetNodePath( Node );
+            Path         := GetNodePath( fNode );
             PathNull     := FALSE;
         end;
         Inc( fNumber );
         NumberNull := FALSE;
+        RootNull   := ( fRoot = nil );
+        Root       := INT64( POINTER( fRoot ) );
+        NodeNull   := ( fNode = nil );
+        Node       := INT64( POINTER( fNode ) );
+
         Result     := TRUE;
+
     end else begin
-        Result := FALSE;
-        ReleaseDoc;
+
+        Result     := FALSE;
+
     end;
-    NumberOk   := RoutineContext.WriteOutputLongint(  AStatus, TNodesProcedure.OUTPUT_FIELD_NUMBER, fNumber,  NumberNull   );
-    SourceOk   := RoutineContext.WriteOutputString(   AStatus, TNodesProcedure.OUTPUT_FIELD_SOURCE, Source,   SourceNull   );
-    NameOk     := RoutineContext.WriteOutputString(   AStatus, TNodesProcedure.OUTPUT_FIELD_NAME,   Name,     NameNull     );
-    TextOk     := RoutineContext.WriteOutputString(   AStatus, TNodesProcedure.OUTPUT_FIELD_TEXT,   Text,     TextNull     );
-    NodeTypeOk := RoutineContext.WriteOutputSmallint( AStatus, TNodesProcedure.OUTPUT_FIELD_TYPE,   NodeType, NodeTypeNull );
-    PathOk     := RoutineContext.WriteOutputString(   AStatus, TNodesProcedure.OUTPUT_FIELD_PATH,   Path,     PathNull     );
-end;{ TNodesResultSet.fetch }
+    NumberOk   := RoutineContext.WriteOutputLongint(  AStatus, TBaseNodesProcedure.OUTPUT_FIELD_NUMBER, fNumber,  NumberNull   );
+    SourceOk   := RoutineContext.WriteOutputString(   AStatus, TBaseNodesProcedure.OUTPUT_FIELD_SOURCE, Source,   SourceNull   );
+    NameOk     := RoutineContext.WriteOutputString(   AStatus, TBaseNodesProcedure.OUTPUT_FIELD_NAME,   Name,     NameNull     );
+    TextOk     := RoutineContext.WriteOutputString(   AStatus, TBaseNodesProcedure.OUTPUT_FIELD_TEXT,   Text,     TextNull     );
+    NodeTypeOk := RoutineContext.WriteOutputSmallint( AStatus, TBaseNodesProcedure.OUTPUT_FIELD_TYPE,   NodeType, NodeTypeNull );
+    PathOk     := RoutineContext.WriteOutputString(   AStatus, TBaseNodesProcedure.OUTPUT_FIELD_PATH,   Path,     PathNull     );
+    RootOk     := RoutineContext.WriteOutputBigint(   AStatus, TBaseNodesProcedure.OUTPUT_FIELD_ROOT,   Root,     RootNull     );
+    NodeOk     := RoutineContext.WriteOutputBigint(   AStatus, TBaseNodesProcedure.OUTPUT_FIELD_NODE,   Node,     NodeNull     );
+end;{ TBaseNodesResultSet.fetch }
+
+
+{ THNodesProcedureFactory }
+
+function THNodesProcedureFactory.newItem( AStatus:IStatus; AContext:IExternalContext; AMetadata:IRoutineMetadata ):IExternalProcedure;
+begin
+    Result := THNodesProcedure.create( AMetadata );
+end;{ THNodesProcedureFactory.newItem }
+
+{ THNodesProcedure }
+
+class function THNodesProcedure.GetBwrResultSetClass:TBwrResultSetClass;
+begin
+    Result := THNodesResultSet;
+end;{ THNodesProcedure.GetBwrResultSetClass }
+
+{ THNodesResultSet }
+
+procedure THNodesResultSet.SetRoot( AStatus:IStatus );
+var
+    Node64        : INT64;
+    Node          : IDOMNodeEx absolute Node64;
+    NodeNull      : WORDBOOL;
+    NodeOk        : BOOLEAN;
+begin
+    NodeOk := RoutineContext.ReadInputBigint( AStatus, THNodesProcedure.INPUT_FIELD_NODE, Node64, NodeNull  );
+    if( NodeOk )then begin
+        fRoot  := Node;
+        Node64 := 0;
+    end;
+end;{ THNodesResultSet.SetRoot }
+
+
+{ TXNodesProcedureFactory }
+
+function TXNodesProcedureFactory.newItem( AStatus:IStatus; AContext:IExternalContext; AMetadata:IRoutineMetadata ):IExternalProcedure;
+begin
+    Result := TXNodesProcedure.create( AMetadata );
+end;{ TXNodesProcedureFactory.newItem }
+
+{ TXNodesProcedure }
+
+class function TXNodesProcedure.GetBwrResultSetClass:TBwrResultSetClass;
+begin
+    Result := TXNodesResultSet;
+end;{ TXNodesProcedure.GetBwrResultSetClass }
+
+{ TXNodesResultSet }
+
+procedure TXNodesResultSet.SetRoot( AStatus:IStatus );
+var
+    Xml     : UnicodeString;
+    XmlNull : WORDBOOL;
+    XmlOk   : BOOLEAN;
+    XmlDocOptions : TXMLDocOptions;
+begin
+    XmlOk := RoutineContext.ReadInputString( AStatus, TXNodesProcedure.INPUT_FIELD_XML, Xml, XmlNull );
+    if( XmlOk and ( not XmlNull ) and ( Xml <> '' ) )then begin
+        fDoc := LoadXMLData( Xml );
+        if( fDoc <> nil )then begin
+            XmlDocOptions := fDoc.Options;
+            Exclude( XmlDocOptions, doNamespaceDecl );
+            fDoc.Options := XmlDocOptions;
+            fRoot := GetDOMNodeEx( fDoc.DOMDocument );
+        end;
+    end;
+end;{ TXNodesResultSet.SetRoot }
+
+destructor TXNodesResultSet.Destroy;
+begin
+    inherited Destroy;
+    fDoc := nil;
+end;{ TXNodesResultSet.Destroy; }
+
+
+{routines}
 
 function GetNodeSource( Node:IDOMNodeEx ):UnicodeString;
 begin
@@ -327,6 +478,7 @@ begin
     end;
 end;{ GetNodePath }
 
+{$REGION ADOMXML}
 {$IFDEF ADOMXML}
 //ADOM vendor does not recognize xpath like '/xxx:yyy'.
 //This code snippet is intended to fix it.
@@ -343,9 +495,7 @@ begin
     end;
     RootNode := ContextNode.firstChild;
     if( ( RootNode <> nil ) and SameText( RootNode.NodeName, 'xml' ) )then begin
-        if( SameText( RootNode.NodeName, 'xml' ) )then begin
-            RootNode := RootNode.nextSibling;
-        end;
+        RootNode := RootNode.nextSibling;
     end;
     if( RootNode <> nil )then begin
         attributes := RootNode.attributes;
@@ -371,6 +521,7 @@ begin
 end;{ TLookupNamespaceHelper.DoLookupNamespaceURI }
 
 {$ENDIF}
+{$ENDREGION}
 
 procedure InitProc;
 begin
@@ -392,7 +543,8 @@ begin
         CoUninitialize();
     {$ELSEIF Defined(OMNIXML)}
     {$ELSEIF Defined(ADOMXML)}
-        Xml.adomxmldom.OnOx4XPathLookupNamespaceURI := nil;
+        //shalamyansky 2025-07-24 commented - probable unloading AV cause
+        //Xml.adomxmldom.OnOx4XPathLookupNamespaceURI := nil;
     {$IFEND}
 end;{ FinalProc }
 
