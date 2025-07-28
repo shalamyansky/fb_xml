@@ -27,7 +27,9 @@ ADOM4 supports XPath better but OmniXML is faster.
      a) ADOM4
      b) OmniXML.
  2025-01-29 ver. 2.1.4.0
- - Blobs are created as stream and temporary ones;
+ - Blobs are created as stream and temporary ones.
+ 2025-07-25 ver. 3.0.0.0
+ - handle_ family routines are implemented.
 *)
 
 
