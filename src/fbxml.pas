@@ -30,8 +30,8 @@ engine
     udr
 ;
 
-create or alter procedure $nodes(
-    $xml      bigint
+create or alter procedure handle_nodes(
+    handle    bigint
   , xpath     varchar(8191)      character set UTF8
 )returns(
     number    integer
@@ -44,7 +44,7 @@ create or alter procedure $nodes(
   , node      bigint
 )
 external name
-    'fb_xml!$nodes'
+    'fb_xml!handle_nodes'
 engine
     udr
 ;

@@ -38,18 +38,40 @@ recreate package body xml
 as
 begin
 
-procedure nodes(
-    xml          blob sub_type text character set UTF8
-  , xpath        varchar(8191)      character set UTF8
+create or alter procedure nodes(
+    xml       blob sub_type text character set UTF8
+  , xpath     varchar(8191)      character set UTF8
 )returns(
-    number       integer
-  , source       blob sub_type text character set UTF8
-  , name         varchar(8191)      character set UTF8
-  , text         varchar(8191)      character set UTF8
-  , is_attribute boolean
+    number    integer
+  , source    blob sub_type text character set UTF8
+  , name      varchar(8191)      character set UTF8
+  , text      varchar(8191)      character set UTF8
+  , node_type smallint
+  , path      varchar(8191)      character set UTF8
+  , root      bigint
+  , node      bigint
 )
 external name
     'fb_xml!nodes'
+engine
+    udr
+;
+
+create or alter procedure handle_nodes(
+    handle    bigint
+  , xpath     varchar(8191)      character set UTF8
+)returns(
+    number    integer
+  , source    blob sub_type text character set UTF8
+  , name      varchar(8191)      character set UTF8
+  , text      varchar(8191)      character set UTF8
+  , node_type smallint
+  , path      varchar(8191)      character set UTF8
+  , root      bigint
+  , node      bigint
+)
+external name
+    'fb_xml!handle_nodes'
 engine
     udr
 ;
